@@ -53,28 +53,28 @@ def login():
         or not login_params['j_password']
         or not bungalow['headers']['X-API-Key']
         ):
-        return pretty({'response': 'Please submit username, password, and api-key'}), 401
+        return pretty({'Response': 'Please submit username, password, and api-key'}), 401
 
     psn = requests.Session()
     r = psn.get(auth_base_url, params=auth_params, allow_redirects=False)
     if 'JSESSIONID' not in r.cookies:
-        return pretty({'response': 'Error getting initial OAuth cookie from PSN'}), 403
+        return pretty({'Response': 'Error getting initial OAuth cookie from PSN'}), 403
 
     r = psn.post(login_url, data=login_params, allow_redirects=False)
     if 'JSESSIONID' not in r.cookies or 'authentication_error' in r.headers['location']:
-        return pretty({'response': 'Error authenticating to PSN'}), 401
+        return pretty({'Response': 'Error authenticating to PSN'}), 401
 
     r = psn.get(auth_base_url, params=auth_params, allow_redirects=False)
     if 'bungie.net' not in r.headers['location']:
-        return pretty({'response': 'Error completing OAuth transaction for Bungie callback'}), 403
+        return pretty({'Response': 'Error completing OAuth transaction for Bungie callback'}), 403
 
     r = requests.get(r.headers['location'])
     if r.status_code != 200:
-        return pretty({'response': 'Error obtaining API cookies from Bungie'}), 403
+        return pretty({'Response': 'Error obtaining API cookies from Bungie'}), 403
 
     bungalow['cookies'] = requests.utils.dict_from_cookiejar(r.cookies)
     bungalow['headers']['x-csrf'] = bungalow['cookies']['bungled']
-    return pretty({'response': 'Success'})
+    return pretty({'Response': 'Success'})
 
 @app.route('/user')
 def get_user():
