@@ -8,20 +8,21 @@ app = Flask(__name__)
 
 bungalow = {
     'cookies': {},
-    'headers': {
-        'X-API-Key': 'a08ca144c892448d939e8b1ccc1a2f83'
-    }
+    'headers': {},
+    'gamerId': None,
+    'memberId': None,
+    'type': '2'      # XBL = 1; PSN = 2
 }
 
 def pretty(data):
     return json.dumps(data, indent=4, sort_keys=True)
 
 @app.route('/')
-def manifest():
+def get_bungalow():
     if 'cookies' not in bungalow or not bungalow['cookies']:
         return redirect(url_for('login'))
     else:
-        return pretty(bungalow['cookies'])
+        return pretty(bungalow)
 
 @app.route('/login', methods=['POST'])
 def login():
@@ -46,8 +47,13 @@ def login():
         'j_password': request.args.get('password')
     }
 
-    if not login_params['j_username'] or not login_params['j_password']:
-        return pretty({'response': 'Please submit both username and password'}), 401
+    bungalow['headers']['X-API-Key'] = request.args.get('api-key')
+
+    if (not login_params['j_username']
+        or not login_params['j_password']
+        or not bungalow['headers']['X-API-Key']
+        ):
+        return pretty({'response': 'Please submit username, password, and api-key'}), 401
 
     psn = requests.Session()
     r = psn.get(auth_base_url, params=auth_params, allow_redirects=False)
@@ -77,7 +83,41 @@ def get_user():
         headers=bungalow['headers'],
         cookies=bungalow['cookies']
     )
+    bungalow['gamerId'] = r.json()['Response']['psnId']
     return pretty(r.json()), r.status_code
+
+@app.route('/manifest')
+def get_manifest():
+    r = requests.get(
+        'http://www.bungie.net/platform/Destiny/Manifest',
+        headers=bungalow['headers'],
+        cookies=bungalow['cookies']
+    )
+    return pretty(r.json()), r.status_code
+
+@app.route('/user/characters')
+def get_characters():
+    r = requests.get(
+        'http://www.bungie.net/platform/Destiny/SearchDestinyPlayer/' +
+        bungalow['type'] + '/' +
+        bungalow['gamerId'] + '/',
+        headers=bungalow['headers'],
+        cookies=bungalow['cookies']
+    )
+    if not 'Response' in r.json():
+        return r.text, 404
+
+    bungalow['memberId'] = r.json()['Response'][0]['membershipId']
+    r = requests.get(
+        'http://www.bungie.net/platform/Destiny/TigerPSN/Account/' +
+        bungalow['memberId'] + '/',
+        headers=bungalow['headers'],
+        cookies=bungalow['cookies']
+    )
+    if not 'Response' in r.json():
+        return r.text, 404
+    else:
+        return pretty(r.json()), r.status_code
 
 if __name__ == '__main__':
     app.run(debug=True)
